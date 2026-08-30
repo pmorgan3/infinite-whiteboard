@@ -16,9 +16,10 @@ interface CanvasProps {
   onWhiteboardReady?: (wb: Whiteboard) => void;
   theme?: 'light' | 'dark';
   onChange?: () => void;
+  onSelectionChange?: () => void;
 }
 
-export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd, roomId, userName, snapEnabled, onWhiteboardReady, theme, onChange }: CanvasProps) {
+export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd, roomId, userName, snapEnabled, onWhiteboardReady, theme, onChange, onSelectionChange }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wbRef = useRef<Whiteboard | null>(null);
   const collabRef = useRef<CollabProvider | null>(null);
@@ -45,6 +46,7 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
         pendingImagePoint.current = point;
         fileInputRef.current?.click();
       },
+      onSelectionChange,
     });
     wbRef.current = wb;
     onWhiteboardReady?.(wb);

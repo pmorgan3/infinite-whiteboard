@@ -145,6 +145,16 @@ export class UpdateElementCommand implements Command {
   }
 }
 
+export class SnapshotCommand implements Command {
+  constructor(private elements: WBElement[], private before: WBElement[], private after: WBElement[], private applySelection?: (ids: Set<string>) => void, private selectionBefore = new Set<string>(), private selectionAfter = new Set<string>()) {}
+  execute() { replaceElements(this.elements, this.after); this.applySelection?.(new Set(this.selectionAfter)); }
+  undo() { replaceElements(this.elements, this.before); this.applySelection?.(new Set(this.selectionBefore)); }
+}
+
+function replaceElements(target: WBElement[], source: WBElement[]) {
+  target.splice(0, target.length, ...structuredClone(source));
+}
+
 interface PointLike {
   x: number;
   y: number;

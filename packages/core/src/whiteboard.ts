@@ -4,9 +4,10 @@ import { Viewport } from './viewport';
 import { Renderer } from './renderer';
 import type { Tool } from './tools';
 import { createTool, generateId } from './tools';
-import { HistoryStack, AddElementCommand, DeleteElementsCommand, UpdateElementCommand } from './history';
+import { HistoryStack, AddElementCommand, DeleteElementsCommand, UpdateElementCommand, SnapshotCommand } from './history';
 import { snapToGrid as snapToGridFn, resolveBindings as resolveBindingsFn } from './snap';
 import { createGroup, getGroupBounds } from './group-utils';
+import { createClipboardPayload, parseClipboardPayload, remapClipboardElements, WHITEBOARD_CLIPBOARD_MIME } from './clipboard';
 
 const STATE_VERSION = '1.0.0';
 
@@ -15,6 +16,7 @@ export interface WhiteboardOptions {
   onChange?: () => void;
   onStartEditing?: (elementId: string) => void;
   onRequestImageUpload?: (point: Point) => void;
+  onSelectionChange?: (ids: Set<string>) => void;
 }
 
 export class Whiteboard {
@@ -57,8 +59,10 @@ export class Whiteboard {
   private rafId: number | null = null;
   private needsRender = false;
   private onChange?: () => void;
+  private pasteCount = 0;
   private onStartEditing?: (elementId: string) => void;
   private onRequestImageUpload?: (point: Point) => void;
+  private onSelectionChange?: (ids: Set<string>) => void;
 
   constructor(options: WhiteboardOptions) {
     this.viewport = new Viewport();
@@ -67,6 +71,7 @@ export class Whiteboard {
     this.onChange = options.onChange;
     this.onStartEditing = options.onStartEditing;
     this.onRequestImageUpload = options.onRequestImageUpload;
+    this.onSelectionChange = options.onSelectionChange;
     this.activeTool = createTool(this.toolType, { color: this.toolColor, strokeWidth: this.toolStrokeWidth });
 
     this.onWheelBind = this.onWheel.bind(this);
@@ -211,6 +216,7 @@ export class Whiteboard {
       getSelectedIds: () => this.selectedIds,
       setSelectedIds: (ids: Set<string>) => {
         this.selectedIds = ids;
+        this.onSelectionChange?.(new Set(ids));
         this.scheduleRender();
       },
       canvasWidth: canvas.clientWidth,
@@ -230,6 +236,12 @@ export class Whiteboard {
       },
       setArrowSnapTarget: (id: string | null) => {
         this.arrowSnapTargetId = id;
+      },
+      commitSnapshot: (before: WBElement[], selectionBefore: Set<string>) => {
+        const after = structuredClone(this.elements);
+        this.history.execute(new SnapshotCommand(this.elements, before, after, ids => { this.selectedIds = ids; }, selectionBefore, this.selectedIds));
+        this.scheduleRender();
+        this.onChange?.();
       },
     };
   }
@@ -360,6 +372,8 @@ export class Whiteboard {
   }
 
   private onKeyDown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') { e.preventDefault(); void this.copySelection(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); this.duplicateSelection(); return; }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
       e.preventDefault();
       if (e.shiftKey) this.redo();
@@ -391,6 +405,9 @@ export class Whiteboard {
   }
 
   private onPaste(e: ClipboardEvent) {
+    const internal = e.clipboardData?.getData(WHITEBOARD_CLIPBOARD_MIME) || e.clipboardData?.getData('text/plain');
+    const payload = internal ? parseClipboardPayload(internal) : null;
+    if (payload) { e.preventDefault(); this.pasteElements(payload.elements); return; }
     const items = e.clipboardData?.items;
     if (!items) return;
     for (const item of items) {
@@ -438,6 +455,55 @@ export class Whiteboard {
     }
   }
 
+  async copySelection(): Promise<void> {
+    if (!this.selectedIds.size) return;
+    const text = JSON.stringify(createClipboardPayload(this.elements, this.selectedIds));
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      await navigator.clipboard.write([new ClipboardItem({ [WHITEBOARD_CLIPBOARD_MIME]: new Blob([text], { type: WHITEBOARD_CLIPBOARD_MIME }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]);
+    } else await navigator.clipboard?.writeText(text);
+  }
+
+  pasteElements(source: WBElement[]): void {
+    this.pasteCount++;
+    const copies = remapClipboardElements(source, 20 * this.pasteCount);
+    const before = structuredClone(this.elements);
+    const selectionBefore = new Set(this.selectedIds);
+    this.elements.push(...copies);
+    this.selectedIds = new Set(copies.map(el => el.id));
+    this.history.execute(new SnapshotCommand(this.elements, before, structuredClone(this.elements), ids => { this.selectedIds = ids; this.onSelectionChange?.(ids); }, selectionBefore, this.selectedIds));
+    this.scheduleRender(); this.onChange?.();
+  }
+
+  duplicateSelection(): void {
+    if (!this.selectedIds.size) return;
+    const payload = createClipboardPayload(this.elements, this.selectedIds);
+    this.pasteCount = 0;
+    this.pasteElements(payload.elements);
+  }
+
+  updateSelection(changes: Pick<Partial<WBElement>, 'color' | 'strokeWidth' | 'locked'>): void {
+    const before = structuredClone(this.elements);
+    let changed = false;
+    for (const el of this.elements) if (this.selectedIds.has(el.id) && (!el.locked || changes.locked !== undefined)) { Object.assign(el, changes); changed = true; }
+    if (changed) { this.history.execute(new SnapshotCommand(this.elements, before, structuredClone(this.elements))); this.scheduleRender(); this.onChange?.(); }
+  }
+
+  reorderSelection(action: 'forward' | 'front' | 'backward' | 'back'): void {
+    const movable = new Set([...this.selectedIds].filter(id => !this.elements.find(el => el.id === id)?.locked));
+    for (const el of this.elements) if (el.type === 'group' && movable.has(el.id)) el.memberIds.forEach(id => movable.add(id));
+    if (!movable.size) return;
+    const before = structuredClone(this.elements);
+    if (action === 'front' || action === 'back') {
+      const chosen = this.elements.filter(el => movable.has(el.id)), rest = this.elements.filter(el => !movable.has(el.id));
+      this.elements.splice(0, this.elements.length, ...(action === 'front' ? [...rest, ...chosen] : [...chosen, ...rest]));
+    } else {
+      const direction = action === 'forward' ? 1 : -1;
+      const start = direction === 1 ? this.elements.length - 2 : 1, end = direction === 1 ? -1 : this.elements.length;
+      for (let i = start; i !== end; i -= direction) if (movable.has(this.elements[i].id) && !movable.has(this.elements[i + direction].id)) [this.elements[i], this.elements[i + direction]] = [this.elements[i + direction], this.elements[i]];
+    }
+    this.history.execute(new SnapshotCommand(this.elements, before, structuredClone(this.elements))); this.scheduleRender(); this.onChange?.();
+  }
+
   getState(themeMode: 'light' | 'dark'): WhiteboardState {
     return {
       version: STATE_VERSION,
@@ -454,7 +520,7 @@ export class Whiteboard {
 
   setState(state: WhiteboardState): void {
     if (state.version !== STATE_VERSION) return;
-    this.elements = state.elements;
+    this.elements = state.elements.map(el => ({ ...el, rotation: el.rotation ?? 0, locked: el.locked ?? false }));
     this.viewport = new Viewport(state.viewport);
     this.toolColor = state.toolColor;
     this.toolStrokeWidth = state.toolStrokeWidth;

@@ -1,3 +1,4 @@
+import { getElementBounds as getCoreElementBounds } from '@whiteboard/core';
 import type { WBElement, GroupElement } from '@whiteboard/core';
 
 export interface ContentBounds {
@@ -28,6 +29,10 @@ export function computeBounds(elements: WBElement[]): ContentBounds | null {
 
 function getElementBounds(el: WBElement): { minX: number; minY: number; maxX: number; maxY: number } {
   const pad = el.strokeWidth ?? 0;
+  if (el.rotation && el.type !== 'path' && el.type !== 'arrow' && el.type !== 'group') {
+    const bounds = getCoreElementBounds(el);
+    return { minX: bounds.left - pad, minY: bounds.top - pad, maxX: bounds.right + pad, maxY: bounds.bottom + pad };
+  }
   switch (el.type) {
     case 'path': {
       const xs = el.points.map(p => p.x);

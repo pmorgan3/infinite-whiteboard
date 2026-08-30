@@ -69,6 +69,10 @@ describe('computeBounds', () => {
 });
 
 describe('exportToSvg', () => {
+  it('exports rotation around the element center', () => {
+    const svg = exportToSvg([{ id: 'rotated', type: 'rectangle', x: 10, y: 20, width: 40, height: 20, rotation: Math.PI / 2, color: '#000', strokeWidth: 2 }]);
+    expect(svg).toContain('rotate(90 30 30)');
+  });
   it('produces valid SVG for empty elements', () => {
     const svg = exportToSvg([]);
     expect(svg).toContain('<svg');

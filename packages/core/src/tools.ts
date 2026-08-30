@@ -1,6 +1,7 @@
 import type { Point, WBElement, ToolType, SnapConfig, SnapGuides, AnchorPosition, ArrowBinding, GroupElement } from './types';
 import { Viewport } from './viewport';
 import { getElementBounds, shiftBounds, snapToGuides, getAnchorPoint } from './snap';
+import { hitTestHandle, pointInRotatedBounds, resizeBounds, rotateElement, transformElement, unionBounds, ROTATION_SNAP } from './geometry';
 
 export interface ToolContext {
   viewport: Viewport;
@@ -22,6 +23,7 @@ export interface ToolContext {
   setGuides(guides: SnapGuides | null): void;
   resolveBindings: () => void;
   setArrowSnapTarget(id: string | null): void;
+  commitSnapshot?(before: WBElement[], selectionBefore: Set<string>): void;
 }
 
 export interface Tool {
@@ -442,6 +444,9 @@ class SelectTool implements Tool {
   private dragStart: Point | null = null;
   private dragOffset: Map<string, Point> = new Map();
   private guides: SnapGuides | null = null;
+  private gestureBefore: WBElement[] | null = null;
+  private selectionBefore = new Set<string>();
+  private transform: { type: 'resize' | 'rotate'; handle?: Exclude<ReturnType<typeof hitTestHandle>, null | 'rotate'>; bounds: ReturnType<typeof getElementBounds>; startAngle?: number; originals: WBElement[] } | null = null;
 
   private findParentGroup(groupMemberId: string, elements: WBElement[]): GroupElement | null {
     for (const el of elements) {
@@ -457,6 +462,7 @@ class SelectTool implements Tool {
     for (const id of ids) {
       const el = elements.find(e => e.id === id);
       if (el?.type === 'group') {
+        if (el.locked) continue;
         for (const mid of (el as GroupElement).memberIds) {
           if (!result.includes(mid)) result.push(mid);
         }
@@ -475,6 +481,20 @@ class SelectTool implements Tool {
       ctx.canvasWidth,
       ctx.canvasHeight
     );
+
+    const selectedElements = this.expandGroupMembers(ctx.getSelectedIds(), ctx.elements)
+      .map(id => ctx.elements.find(el => el.id === id)).filter(Boolean) as WBElement[];
+    const unlockedSelected = selectedElements.filter(el => !el.locked);
+    if (unlockedSelected.length) {
+      const selectionBounds = unionBounds(unlockedSelected.map(getElementBounds));
+      const handle = hitTestHandle(world, selectionBounds, ctx.viewport.zoom);
+      if (handle) {
+        this.gestureBefore = structuredClone(ctx.elements);
+        this.selectionBefore = new Set(ctx.getSelectedIds());
+        this.transform = { type: handle === 'rotate' ? 'rotate' : 'resize', handle: handle === 'rotate' ? undefined : handle, bounds: selectionBounds, startAngle: Math.atan2(world.y - selectionBounds.centerY, world.x - selectionBounds.centerX), originals: structuredClone(unlockedSelected) };
+        return;
+      }
+    }
 
     // Search non-group elements first (reverse order for top-most)
     const clicked = [...ctx.elements].reverse().find((el) =>
@@ -501,11 +521,13 @@ class SelectTool implements Tool {
       }
 
       this.isDragging = true;
+      this.gestureBefore = structuredClone(ctx.elements);
+      this.selectionBefore = new Set(ctx.getSelectedIds());
       this.dragStart = world;
       const expanded = this.expandGroupMembers(ctx.getSelectedIds(), ctx.elements);
       for (const id of expanded) {
         const el = ctx.elements.find((e) => e.id === id);
-        if (el) this.dragOffset.set(id, getElementPos(el));
+        if (el && !el.locked) this.dragOffset.set(id, getElementPos(el));
       }
     } else {
       // Check group elements (lower priority)
@@ -515,11 +537,13 @@ class SelectTool implements Tool {
       if (groupClicked) {
         ctx.setSelectedIds(new Set([groupClicked.id]));
         this.isDragging = true;
+        this.gestureBefore = structuredClone(ctx.elements);
+        this.selectionBefore = new Set(ctx.getSelectedIds());
         this.dragStart = world;
         const expanded = this.expandGroupMembers(ctx.getSelectedIds(), ctx.elements);
         for (const id of expanded) {
           const el = ctx.elements.find((e) => e.id === id);
-          if (el) this.dragOffset.set(id, getElementPos(el));
+          if (el && !el.locked) this.dragOffset.set(id, getElementPos(el));
         }
       } else {
         if (!e.shiftKey) {
@@ -531,6 +555,24 @@ class SelectTool implements Tool {
   }
 
   onPointerMove(e: PointerEvent, ctx: ToolContext) {
+    if (this.transform) {
+      const off = ctx.getOffset(e);
+      const world = ctx.viewport.screenToWorld(off, ctx.canvasWidth, ctx.canvasHeight);
+      const t = this.transform;
+      for (const original of t.originals) {
+        const index = ctx.elements.findIndex(el => el.id === original.id);
+        if (index < 0) continue;
+        if (t.type === 'resize' && t.handle) ctx.elements[index] = transformElement(original, t.bounds, resizeBounds(t.bounds, t.handle, world, e.shiftKey));
+        else {
+          let angle = Math.atan2(world.y - t.bounds.centerY, world.x - t.bounds.centerX) - (t.startAngle ?? 0);
+          if (e.shiftKey) angle = Math.round(angle / ROTATION_SNAP) * ROTATION_SNAP;
+          ctx.elements[index] = rotateElement(original, { x: t.bounds.centerX, y: t.bounds.centerY }, angle);
+        }
+      }
+      ctx.resolveBindings();
+      ctx.scheduleRender();
+      return;
+    }
     if (!this.isDragging || !this.dragStart) return;
     const off = ctx.getOffset(e);
     let world = ctx.viewport.screenToWorld(off, ctx.canvasWidth, ctx.canvasHeight);
@@ -572,18 +614,21 @@ class SelectTool implements Tool {
   }
 
   onPointerUp(_e: PointerEvent, ctx: ToolContext) {
+    if (this.transform) this.transform = null;
     this.isDragging = false;
     this.dragStart = null;
     this.dragOffset.clear();
     this.guides = null;
     ctx.setGuides(null);
     ctx.resolveBindings();
+    if (this.gestureBefore && JSON.stringify(this.gestureBefore) !== JSON.stringify(ctx.elements)) ctx.commitSnapshot?.(this.gestureBefore, this.selectionBefore);
+    this.gestureBefore = null;
     ctx.scheduleRender();
   }
 
   onKeyDown(e: KeyboardEvent, ctx: ToolContext) {
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      const ids = Array.from(ctx.getSelectedIds());
+      const ids = Array.from(ctx.getSelectedIds()).filter(id => !ctx.elements.find(el => el.id === id)?.locked);
       if (ids.length > 0) {
         const expandedIds: string[] = [];
         for (const id of ids) {
@@ -595,7 +640,7 @@ class SelectTool implements Tool {
             expandedIds.push(id);
           }
         }
-        ctx.deleteElements(expandedIds);
+        ctx.deleteElements(expandedIds.filter(id => !ctx.elements.find(el => el.id === id)?.locked));
         ctx.setSelectedIds(new Set());
       }
     }
@@ -620,25 +665,16 @@ export function hitTest(el: WBElement, point: Point): boolean {
     return false;
   }
   if (el.type === 'rectangle') {
-    return (
-      point.x >= el.x - margin &&
-      point.x <= el.x + el.width + margin &&
-      point.y >= el.y - margin &&
-      point.y <= el.y + el.height + margin
-    );
+    return pointInRotatedBounds(point, { left: el.x, top: el.y, right: el.x + el.width, bottom: el.y + el.height, centerX: el.x + el.width / 2, centerY: el.y + el.height / 2, width: el.width, height: el.height }, el.rotation ?? 0, margin);
   }
   if (el.type === 'ellipse') {
-    const nx = (point.x - el.x) / (el.rx + margin);
-    const ny = (point.y - el.y) / (el.ry + margin);
+    const local = el.rotation ? (awaitRotate(point, { x: el.x, y: el.y }, -el.rotation)) : point;
+    const nx = (local.x - el.x) / (el.rx + margin);
+    const ny = (local.y - el.y) / (el.ry + margin);
     return nx * nx + ny * ny <= 1;
   }
   if (el.type === 'text' || el.type === 'image') {
-    return (
-      point.x >= el.x - margin &&
-      point.x <= el.x + el.width + margin &&
-      point.y >= el.y - margin &&
-      point.y <= el.y + el.height + margin
-    );
+    return pointInRotatedBounds(point, { left: el.x, top: el.y, right: el.x + el.width, bottom: el.y + el.height, centerX: el.x + el.width / 2, centerY: el.y + el.height / 2, width: el.width, height: el.height }, el.rotation ?? 0, margin);
   }
   if (el.type === 'arrow') {
     return (
@@ -663,6 +699,11 @@ export function hitTest(el: WBElement, point: Point): boolean {
     );
   }
   return false;
+}
+
+function awaitRotate(point: Point, center: Point, angle: number): Point {
+  const c = Math.cos(angle), s = Math.sin(angle), dx = point.x - center.x, dy = point.y - center.y;
+  return { x: center.x + dx * c - dy * s, y: center.y + dx * s + dy * c };
 }
 
 function pointToSegmentDistance(p: Point, a: Point, b: Point): number {
