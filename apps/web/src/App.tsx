@@ -3,6 +3,9 @@ import Canvas from './Canvas';
 import Toolbar from './Toolbar';
 import BottomSheet from './BottomSheet';
 import Titlebar from './Titlebar';
+import NavigationControls from './NavigationControls';
+import Minimap from './Minimap';
+import SearchPopover from './SearchPopover';
 import { useMediaQuery } from './useMediaQuery';
 import { useTheme } from './useTheme';
 import { useAutoSave, loadState } from './useAutoSave';
@@ -27,6 +30,11 @@ function App() {
   const [showCollab, setShowCollab] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [saveNotice, setSaveNotice] = useState(false);
+  const [whiteboard, setWhiteboard] = useState<Whiteboard | null>(null);
+  const [navigationRevision, setNavigationRevision] = useState(0);
+  const [contentRevision, setContentRevision] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [minimapCollapsed, setMinimapCollapsed] = useState(() => localStorage.getItem('whiteboard:minimap-collapsed') === 'true');
   const wbRef = useRef<Whiteboard | null>(null);
   const isMobile = useMediaQuery('(max-width: 640px)');
   const { resolvedTheme, toggle: toggleTheme } = useTheme();
@@ -48,11 +56,39 @@ function App() {
 
   const handleWhiteboardReady = useCallback((wb: Whiteboard) => {
     wbRef.current = wb;
+    setWhiteboard(wb);
     if (savedState) {
       wb.setState(savedState);
     }
     setRestored(true);
   }, [savedState]);
+
+  const navigate = useCallback((action: (wb: Whiteboard) => boolean | void) => {
+    const wb = wbRef.current;
+    if (!wb) return;
+    const start = wb.viewport.toState();
+    const result = action(wb);
+    if (result === false) return;
+    const end = wb.viewport.toState();
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    wb.viewport.x = start.x; wb.viewport.y = start.y; wb.viewport.zoom = start.zoom;
+    const started = performance.now();
+    const frame = (now: number) => {
+      const progress = Math.min(1, (now - started) / 200);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      wb.viewport.x = start.x + (end.x - start.x) * eased;
+      wb.viewport.y = start.y + (end.y - start.y) * eased;
+      wb.viewport.zoom = start.zoom + (end.zoom - start.zoom) * eased;
+      wb.notifyViewportChange();
+      if (progress < 1) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }, []);
+
+  const setMinimapPreference = (collapsed: boolean) => {
+    setMinimapCollapsed(collapsed);
+    localStorage.setItem('whiteboard:minimap-collapsed', String(collapsed));
+  };
 
   useEffect(() => {
     if (!restored) return;
@@ -108,6 +144,8 @@ function App() {
           wb.elements = data.elements;
           wb.viewport = new Viewport(data.viewport);
           wb.scheduleRender();
+          setContentRevision((value) => value + 1);
+          setNavigationRevision((value) => value + 1);
         } catch {
           alert('Invalid file format');
         }
@@ -132,6 +170,14 @@ function App() {
         handleManualSave();
         return;
       }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault(); setSearchOpen(true); return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault(); navigate((wb) => wb.setZoomAroundPoint(1)); return;
+      }
+      if (e.shiftKey && e.key === '1') { e.preventDefault(); navigate((wb) => wb.fitAll()); return; }
+      if (e.shiftKey && e.key === '2') { e.preventDefault(); navigate((wb) => wb.fitSelection()); return; }
       switch (e.key) {
         case 'v': case 'V': setTool('select'); break;
         case 'h': case 'H': setTool('pan'); break;
@@ -145,7 +191,7 @@ function App() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [handleManualSave, navigate]);
 
   return (
     <div className="app">
@@ -164,7 +210,13 @@ function App() {
         onWhiteboardReady={handleWhiteboardReady}
         theme={resolvedTheme}
         onChange={debouncedSave}
+        onContentChange={() => setContentRevision((value) => value + 1)}
+        onViewportChange={() => setNavigationRevision((value) => value + 1)}
       />
+
+      <NavigationControls whiteboard={whiteboard} revision={navigationRevision} navigate={navigate} />
+      <Minimap whiteboard={whiteboard} revision={navigationRevision + contentRevision} theme={resolvedTheme} collapsed={minimapCollapsed} onCollapsedChange={setMinimapPreference} />
+      <SearchPopover open={searchOpen} onClose={() => setSearchOpen(false)} whiteboard={whiteboard} contentRevision={contentRevision} navigate={navigate} />
 
       <Toolbar
         tool={tool}

@@ -16,9 +16,11 @@ interface CanvasProps {
   onWhiteboardReady?: (wb: Whiteboard) => void;
   theme?: 'light' | 'dark';
   onChange?: () => void;
+  onContentChange?: () => void;
+  onViewportChange?: () => void;
 }
 
-export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd, roomId, userName, snapEnabled, onWhiteboardReady, theme, onChange }: CanvasProps) {
+export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd, roomId, userName, snapEnabled, onWhiteboardReady, theme, onChange, onContentChange, onViewportChange }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wbRef = useRef<Whiteboard | null>(null);
   const collabRef = useRef<CollabProvider | null>(null);
@@ -37,6 +39,12 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
           collabRef.current.setElements(wb.elements);
         }
         onChange?.();
+        onContentChange?.();
+        forceUpdate((value) => value + 1);
+      },
+      onViewportChange: () => {
+        forceUpdate((value) => value + 1);
+        onViewportChange?.();
       },
       onStartEditing: (elementId) => {
         setEditingElementId(elementId);
@@ -81,6 +89,7 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
       onElementsChange: (elements) => {
         wb.elements = elements;
         wb.scheduleRender();
+        onContentChange?.();
       },
       onCursorsChange: (newCursors) => {
         setCursors(new Map(newCursors));
@@ -109,17 +118,6 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
       collabRef.current = null;
     };
   }, [roomId, userName, color]);
-
-  // Force cursor re-render on animation frame so they follow pan/zoom
-  useEffect(() => {
-    let raf: number;
-    const tick = () => {
-      forceUpdate((n) => n + 1);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
 
   const getScreenPos = useCallback((world: Point): Point | null => {
     const wb = wbRef.current;

@@ -1,4 +1,4 @@
-import type { Point, WBElement, ToolType, SnapConfig, SnapGuides, ThemeConfig, WhiteboardState, GroupElement } from './types';
+import type { Point, WBElement, ToolType, SnapConfig, SnapGuides, ThemeConfig, WhiteboardState, GroupElement, Bounds, ViewportState } from './types';
 import { DARK_THEME, GROUP_COLORS } from './types';
 import { Viewport } from './viewport';
 import { Renderer } from './renderer';
@@ -6,6 +6,7 @@ import type { Tool } from './tools';
 import { createTool, generateId } from './tools';
 import { HistoryStack, AddElementCommand, DeleteElementsCommand, UpdateElementCommand } from './history';
 import { snapToGrid as snapToGridFn, resolveBindings as resolveBindingsFn } from './snap';
+import { getElementsBounds, viewportForBounds, MAX_ZOOM, MIN_ZOOM } from './navigation';
 import { createGroup, getGroupBounds } from './group-utils';
 
 const STATE_VERSION = '1.0.0';
@@ -13,6 +14,7 @@ const STATE_VERSION = '1.0.0';
 export interface WhiteboardOptions {
   canvas: HTMLCanvasElement;
   onChange?: () => void;
+  onViewportChange?: () => void;
   onStartEditing?: (elementId: string) => void;
   onRequestImageUpload?: (point: Point) => void;
 }
@@ -57,6 +59,7 @@ export class Whiteboard {
   private rafId: number | null = null;
   private needsRender = false;
   private onChange?: () => void;
+  private onViewportChange?: () => void;
   private onStartEditing?: (elementId: string) => void;
   private onRequestImageUpload?: (point: Point) => void;
 
@@ -65,6 +68,7 @@ export class Whiteboard {
     this.renderer = new Renderer(options.canvas, () => this.scheduleRender());
     this.history = new HistoryStack();
     this.onChange = options.onChange;
+    this.onViewportChange = options.onViewportChange;
     this.onStartEditing = options.onStartEditing;
     this.onRequestImageUpload = options.onRequestImageUpload;
     this.activeTool = createTool(this.toolType, { color: this.toolColor, strokeWidth: this.toolStrokeWidth });
@@ -215,7 +219,10 @@ export class Whiteboard {
       },
       canvasWidth: canvas.clientWidth,
       canvasHeight: canvas.clientHeight,
-      scheduleRender: () => this.scheduleRender(),
+      scheduleRender: () => {
+        this.scheduleRender();
+        this.onViewportChange?.();
+      },
       getOffset,
       activeColor: this.toolColor,
       startEditing: (id: string) => this.startEditing(id),
@@ -261,6 +268,7 @@ export class Whiteboard {
     this.viewport.y += (worldAfter.y - worldBefore.y) * this.viewport.zoom;
 
     this.scheduleRender();
+    this.onViewportChange?.();
   }
 
   private onPointerDown(e: PointerEvent) {
@@ -338,6 +346,7 @@ export class Whiteboard {
       this.viewport.x += (currentCenter.x - this.touchStartCenter.x);
       this.viewport.y += (currentCenter.y - this.touchStartCenter.y);
       this.scheduleRender();
+      this.onViewportChange?.();
     }
   }
 
@@ -349,6 +358,7 @@ export class Whiteboard {
         this.viewport.y = 0;
         this.viewport.zoom = 1;
         this.scheduleRender();
+        this.onViewportChange?.();
       }
       this.lastTapTime = now;
     }
@@ -388,7 +398,45 @@ export class Whiteboard {
   private onResize() {
     this.renderer.resize();
     this.scheduleRender();
+    this.onViewportChange?.();
   }
+
+  setZoomAroundPoint(zoom: number, screenX?: number, screenY?: number): void {
+    const canvas = this.renderer['canvas'] as HTMLCanvasElement;
+    this.viewport.zoomToPoint(screenX ?? canvas.clientWidth / 2, screenY ?? canvas.clientHeight / 2,
+      zoom, canvas.clientWidth, canvas.clientHeight);
+    this.scheduleRender();
+    this.onViewportChange?.();
+  }
+
+  setViewport(state: Partial<ViewportState>): void {
+    if (state.x !== undefined && Number.isFinite(state.x)) this.viewport.x = state.x;
+    if (state.y !== undefined && Number.isFinite(state.y)) this.viewport.y = state.y;
+    if (state.zoom !== undefined && Number.isFinite(state.zoom)) this.viewport.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, state.zoom));
+    this.scheduleRender();
+    this.onViewportChange?.();
+  }
+
+  fitBounds(bounds: Bounds, padding = 48): boolean {
+    const canvas = this.renderer['canvas'] as HTMLCanvasElement;
+    const next = viewportForBounds(bounds, canvas.clientWidth, canvas.clientHeight, padding);
+    if (!next) return false;
+    this.viewport.x = next.x; this.viewport.y = next.y; this.viewport.zoom = next.zoom;
+    this.scheduleRender(); this.onViewportChange?.();
+    return true;
+  }
+
+  fitAll(padding = 48): boolean {
+    const bounds = getElementsBounds(this.elements.filter((el) => el.type !== 'group'));
+    return bounds ? this.fitBounds(bounds, padding) : false;
+  }
+
+  fitSelection(padding = 48): boolean {
+    const bounds = getElementsBounds(this.elements.filter((el) => this.selectedIds.has(el.id)));
+    return bounds ? this.fitBounds(bounds, padding) : false;
+  }
+
+  notifyViewportChange(): void { this.scheduleRender(); this.onViewportChange?.(); }
 
   private onPaste(e: ClipboardEvent) {
     const items = e.clipboardData?.items;

@@ -10,3 +10,4 @@ export { HistoryStack, AddElementCommand, DeleteElementsCommand, MoveElementsCom
 export type { Command } from './history';
 export { snapToGrid, snapToGuides, getElementBounds, shiftBounds, getAnchorPoint, resolveBindings, cleanupBindings } from './snap';
 export { createGroup, getGroupBounds, dissolveGroup, moveToGroup } from './group-utils';
+export { MIN_ZOOM, MAX_ZOOM, unionBounds, getElementsBounds, viewportForBounds } from './navigation';
