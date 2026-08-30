@@ -181,6 +181,15 @@ export class Whiteboard {
     this.onChange?.();
   }
 
+  deleteElementsWithHistory(ids: string[]) {
+    if (ids.length === 0) return;
+    this.history.execute(new DeleteElementsCommand(this.elements, ids));
+    this.cleanupOrphanedMembers(new Set(ids));
+    this.selectedIds = new Set([...this.selectedIds].filter(id => !ids.includes(id)));
+    this.scheduleRender();
+    this.onChange?.();
+  }
+
   private getToolContext() {
     const canvas = this.renderer['canvas'] as HTMLCanvasElement;
     const getOffset = (e: PointerEvent): Point => {

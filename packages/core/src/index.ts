@@ -1,4 +1,4 @@
-export type { Point, ViewportState, WBElement, ToolType, Selection, TextElement, ImageElement, ArrowElement, SnapConfig, Bounds, SnapGuides, ThemeConfig, WhiteboardState, AnchorPosition, ArrowBinding, GroupElement } from './types';
+export type { Point, ViewportState, WBElement, ToolType, Selection, TextElement, StickyNoteElement, TextAlign, FontWeight, FontStyle, ImageElement, ArrowElement, SnapConfig, Bounds, SnapGuides, ThemeConfig, WhiteboardState, AnchorPosition, ArrowBinding, GroupElement } from './types';
 export { LIGHT_THEME, DARK_THEME, GROUP_COLORS } from './types';
 export { Viewport } from './viewport';
 export { Renderer } from './renderer';
@@ -10,3 +10,5 @@ export { HistoryStack, AddElementCommand, DeleteElementsCommand, MoveElementsCom
 export type { Command } from './history';
 export { snapToGrid, snapToGuides, getElementBounds, shiftBounds, getAnchorPoint, resolveBindings, cleanupBindings } from './snap';
 export { createGroup, getGroupBounds, dissolveGroup, moveToGroup } from './group-utils';
+export { layoutText, requiredTextHeight, textFont, TEXT_PADDING, TEXT_LINE_HEIGHT } from './text-layout';
+export type { TextLayoutOptions, TextLayoutLine } from './text-layout';

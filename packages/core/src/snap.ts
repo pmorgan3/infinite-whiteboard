@@ -52,6 +52,7 @@ export function getElementBounds(el: WBElement): Bounds {
       };
     }
     case 'text':
+    case 'sticky':
     case 'image':
       return {
         left: el.x,

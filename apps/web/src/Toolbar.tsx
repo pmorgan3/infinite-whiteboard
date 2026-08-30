@@ -28,6 +28,7 @@ const TOOLS: { type: ToolType; label: string; icon: string }[] = [
   { type: 'ellipse', label: 'Ellipse', icon: '⬭' },
   { type: 'arrow', label: 'Arrow', icon: '→' },
   { type: 'text', label: 'Text', icon: 'T' },
+  { type: 'sticky', label: 'Sticky note (N)', icon: '▧' },
   { type: 'image', label: 'Image', icon: '🖼' },
 ];
 

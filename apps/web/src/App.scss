@@ -191,6 +191,40 @@ body {
   gap: 4px;
 }
 
+.formatting-bar {
+  position: absolute;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  max-width: calc(100vw - 24px);
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-md);
+
+  button, select, input {
+    min-height: 36px;
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  input[type='number'] { width: 62px; }
+  input[type='color'] { width: 40px; padding: 2px; }
+  button[aria-pressed='true'] { background: var(--active-bg); border-color: var(--active-border); }
+}
+
+@media (max-width: 640px) {
+  .formatting-bar { bottom: calc(76px + env(safe-area-inset-bottom)); }
+}
+
 .toolbar {
   display: flex;
   flex-direction: column;

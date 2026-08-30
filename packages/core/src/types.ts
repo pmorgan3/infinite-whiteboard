@@ -9,7 +9,11 @@ export interface ViewportState {
   zoom: number;
 }
 
-export type ToolType = 'pan' | 'draw' | 'rectangle' | 'ellipse' | 'select' | 'text' | 'image' | 'arrow';
+export type ToolType = 'pan' | 'draw' | 'rectangle' | 'ellipse' | 'select' | 'text' | 'sticky' | 'image' | 'arrow';
+
+export type TextAlign = 'left' | 'center' | 'right';
+export type FontWeight = 'normal' | 'bold';
+export type FontStyle = 'normal' | 'italic';
 
 export interface BaseElement {
   id: string;
@@ -49,6 +53,24 @@ export interface TextElement extends BaseElement {
   fontSize: number;
   fontFamily: string;
   fill: string;
+  textAlign?: TextAlign;
+  fontWeight?: FontWeight;
+  fontStyle?: FontStyle;
+}
+
+export interface StickyNoteElement extends BaseElement {
+  type: 'sticky';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text: string;
+  fill: string;
+  fontSize: number;
+  fontFamily: string;
+  textAlign: TextAlign;
+  fontWeight: FontWeight;
+  fontStyle: FontStyle;
 }
 
 export interface ImageElement extends BaseElement {
@@ -100,7 +122,7 @@ export const GROUP_COLORS = [
   '#f3e8ff',  // Purple 100
 ];
 
-export type WBElement = PathElement | RectangleElement | EllipseElement | TextElement | ImageElement | ArrowElement | GroupElement;
+export type WBElement = PathElement | RectangleElement | EllipseElement | TextElement | StickyNoteElement | ImageElement | ArrowElement | GroupElement;
 
 export interface Selection {
   elementIds: Set<string>;

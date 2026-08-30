@@ -157,7 +157,7 @@ function getPos(el: WBElement): PointLike {
   }
   if (el.type === 'rectangle') return { x: el.x, y: el.y };
   if (el.type === 'ellipse') return { x: el.x - el.rx, y: el.y - el.ry };
-  if (el.type === 'text') return { x: el.x, y: el.y };
+  if (el.type === 'text' || el.type === 'sticky') return { x: el.x, y: el.y };
   if (el.type === 'image') return { x: el.x, y: el.y };
   if (el.type === 'arrow') return { x: el.startX, y: el.startY };
   if (el.type === 'group') {
@@ -183,7 +183,7 @@ function setPos(el: WBElement, x: number, y: number) {
   } else if (el.type === 'ellipse') {
     el.x = x + el.rx;
     el.y = y + el.ry;
-  } else if (el.type === 'text') {
+  } else if (el.type === 'text' || el.type === 'sticky') {
     el.x = x;
     el.y = y;
   } else if (el.type === 'image') {

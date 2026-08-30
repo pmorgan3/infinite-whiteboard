@@ -1,6 +1,7 @@
 import type { WBElement, GroupElement } from '@whiteboard/core';
 import type { ExportOptions } from './types';
 import { computeBounds } from './bounds';
+import { layoutText } from '@whiteboard/core';
 
 export function exportToSvg(
   elements: WBElement[],
@@ -69,6 +70,8 @@ function elementToSvg(el: WBElement): string {
       return ellipseToSvg(el);
     case 'text':
       return textToSvg(el);
+    case 'sticky':
+      return stickyToSvg(el);
     case 'image':
       return imageToSvg(el);
     case 'arrow':
@@ -94,12 +97,20 @@ function ellipseToSvg(el: Extract<WBElement, { type: 'ellipse' }>): string {
 }
 
 function textToSvg(el: Extract<WBElement, { type: 'text' }>): string {
-  const lines = el.text.split('\n');
-  const lineHeight = el.fontSize * 1.3;
-  const tspans = lines
-    .map((line, i) => `<tspan x="${el.x + 4}" dy="${i === 0 ? 0 : lineHeight}">${escapeXml(line)}</tspan>`)
-    .join('');
-  return `<text x="${el.x}" y="${el.y + el.fontSize}" font-size="${el.fontSize}" font-family="${el.fontFamily}" fill="${el.color}">${tspans}</text>`;
+  return richTextSvg(el);
+}
+
+function stickyToSvg(el: Extract<WBElement, { type: 'sticky' }>): string {
+  return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" fill="${escapeXml(el.fill)}" />\n    ${richTextSvg(el)}`;
+}
+
+function richTextSvg(el: Extract<WBElement, { type: 'text' | 'sticky' }>): string {
+  const weight = el.fontWeight ?? 'normal';
+  const style = el.fontStyle ?? 'normal';
+  const approximateMeasure = (text: string) => text.length * el.fontSize * 0.45;
+  const lines = layoutText({ text: el.text, width: el.width, fontSize: el.fontSize, textAlign: el.textAlign, padding: el.type === 'sticky' ? 8 : 4, measureText: approximateMeasure });
+  const tspans = lines.map(line => `<tspan x="${el.x + line.x}" y="${el.y + line.y + el.fontSize}">${escapeXml(line.text)}</tspan>`).join('');
+  return `<text font-size="${el.fontSize}" font-family="${escapeXml(el.fontFamily)}" font-weight="${weight}" font-style="${style}" fill="${escapeXml(el.color)}">${tspans}</text>`;
 }
 
 function imageToSvg(el: Extract<WBElement, { type: 'image' }>): string {

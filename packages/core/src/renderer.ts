@@ -1,4 +1,5 @@
 import type { WBElement, Point, SnapConfig, SnapGuides, ThemeConfig, AnchorPosition, GroupElement } from './types';
+import { layoutText, textFont } from './text-layout';
 import { LIGHT_THEME } from './types';
 import type { Viewport } from './viewport';
 import { getElementBounds, getAnchorPoint } from './snap';
@@ -189,6 +190,8 @@ export class Renderer {
       this.drawEllipse(el);
     } else if (el.type === 'text') {
       this.drawText(el);
+    } else if (el.type === 'sticky') {
+      this.drawSticky(el);
     } else if (el.type === 'image') {
       this.drawImageElement(el);
     } else if (el.type === 'arrow') {
@@ -279,34 +282,27 @@ export class Renderer {
     this.ctx.strokeRect(el.x, el.y, el.width, el.height);
 
     this.ctx.fillStyle = el.color;
-    this.ctx.font = `${el.fontSize}px ${el.fontFamily}`;
+    this.ctx.font = textFont(el.fontSize, el.fontFamily, el.fontWeight, el.fontStyle);
     this.ctx.textBaseline = 'top';
 
-    const lines = this.wrapText(el.text, el.width - 8);
-    const lineHeight = el.fontSize * 1.3;
-    for (let i = 0; i < lines.length; i++) {
-      this.ctx.fillText(lines[i], el.x + 4, el.y + 4 + i * lineHeight);
+    const lines = layoutText({ text: el.text, width: el.width, fontSize: el.fontSize, textAlign: el.textAlign, measureText: text => this.ctx.measureText(text).width });
+    for (const line of lines) {
+      this.ctx.fillText(line.text, el.x + line.x, el.y + line.y);
     }
   }
 
-  private wrapText(text: string, maxWidth: number): string[] {
-    const paragraphs = text.split('\n');
-    const lines: string[] = [];
-    for (const paragraph of paragraphs) {
-      const words = paragraph.split(' ');
-      let line = '';
-      for (const word of words) {
-        const test = line ? `${line} ${word}` : word;
-        if (this.ctx.measureText(test).width > maxWidth && line) {
-          lines.push(line);
-          line = word;
-        } else {
-          line = test;
-        }
-      }
-      lines.push(line);
-    }
-    return lines;
+  private drawSticky(el: Extract<WBElement, { type: 'sticky' }>) {
+    this.ctx.fillStyle = el.fill;
+    this.ctx.fillRect(el.x, el.y, el.width, el.height);
+    this.ctx.fillStyle = el.color;
+    this.ctx.font = textFont(el.fontSize, el.fontFamily, el.fontWeight, el.fontStyle);
+    this.ctx.textBaseline = 'top';
+    const lines = layoutText({ text: el.text, width: el.width, fontSize: el.fontSize, textAlign: el.textAlign, padding: 8, measureText: text => this.ctx.measureText(text).width });
+    for (const line of lines) this.ctx.fillText(line.text, el.x + line.x, el.y + line.y);
+  }
+
+  wrapText(text: string, maxWidth: number): string[] {
+    return layoutText({ text, width: maxWidth + 16, fontSize: 16, measureText: value => this.ctx.measureText(value).width }).map(line => line.text);
   }
 
   private drawImageElement(el: Extract<WBElement, { type: 'image' }>) {
@@ -406,7 +402,7 @@ export class Renderer {
       bounds = { x: el.x, y: el.y, w: el.width, h: el.height };
     } else if (el.type === 'ellipse') {
       bounds = { x: el.x - el.rx, y: el.y - el.ry, w: el.rx * 2, h: el.ry * 2 };
-    } else if (el.type === 'text' || el.type === 'image') {
+    } else if (el.type === 'text' || el.type === 'sticky' || el.type === 'image') {
       bounds = { x: el.x, y: el.y, w: el.width, h: el.height };
     } else if (el.type === 'arrow') {
       const minX = Math.min(el.startX, el.endX);
