@@ -534,6 +534,16 @@ body {
     font-size: 13px;
     color: var(--text-secondary);
   }
+
+  .collab-actions { display: flex; gap: 8px; button { flex: 1; } }
+  .collab-status, .collab-error, .security-note { margin: 0; font-size: 12px; color: var(--text-secondary); }
+  .collab-error { color: #dc2626; }
+  .collab-status span { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #9ca3af; }
+  .collab-status.status-connected span { background: #10b981; }
+  .collab-status.status-connecting span, .collab-status.status-reconnecting span { background: #f59e0b; }
+  .participants { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-primary); }
+  .participants span { display: flex; align-items: center; gap: 6px; }
+  .participants i { width: 9px; height: 9px; border-radius: 50%; }
 }
 
 .export-panel {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Whiteboard, generateId } from '@whiteboard/core';
 import type { ToolType, Point, TextElement, StickyNoteElement, WBElement, TextAlign, FontWeight, FontStyle } from '@whiteboard/core';
 import { CollabProvider } from '@whiteboard/collab';
-import type { CursorInfo } from '@whiteboard/collab';
+import type { CollabStatus, CursorInfo, ParticipantInfo } from '@whiteboard/collab';
 
 interface CanvasProps {
   tool: ToolType;
@@ -12,6 +12,10 @@ interface CanvasProps {
   arrowEnd?: boolean;
   roomId?: string;
   userName: string;
+  websocketUrl: string;
+  onCollabStatus?: (status: CollabStatus) => void;
+  onParticipantsChange?: (participants: ParticipantInfo[]) => void;
+  onCollabError?: (error: Error | null) => void;
   snapEnabled?: boolean;
   onWhiteboardReady?: (wb: Whiteboard) => void;
   theme?: 'light' | 'dark';
@@ -21,7 +25,7 @@ interface CanvasProps {
   onViewportChange?: () => void;
 }
 
-export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd, roomId, userName, snapEnabled, onWhiteboardReady, theme, onChange, onSelectionChange, onContentChange, onViewportChange }: CanvasProps) {
+export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd, roomId, userName, websocketUrl, onCollabStatus, onParticipantsChange, onCollabError, snapEnabled, onWhiteboardReady, theme, onChange, onSelectionChange, onContentChange, onViewportChange }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wbRef = useRef<Whiteboard | null>(null);
   const collabRef = useRef<CollabProvider | null>(null);
@@ -86,7 +90,7 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
 
     const collab = new CollabProvider({
       roomId,
-      websocketUrl: 'ws://localhost:1234',
+      websocketUrl,
       userName,
       userColor: color,
       onElementsChange: (elements) => {
@@ -97,6 +101,9 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
       onCursorsChange: (newCursors) => {
         setCursors(new Map(newCursors));
       },
+      onParticipantsChange,
+      onStatusChange: onCollabStatus,
+      onError: onCollabError,
     });
 
     collabRef.current = collab;
@@ -119,8 +126,13 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
       window.removeEventListener('pointermove', sendCursor);
       collab.destroy();
       collabRef.current = null;
+      setCursors(new Map());
     };
-  }, [roomId, userName, color]);
+  }, [roomId, websocketUrl]);
+
+  useEffect(() => {
+    collabRef.current?.updateUser(userName, color);
+  }, [userName, color]);
 
   const getScreenPos = useCallback((world: Point): Point | null => {
     const wb = wbRef.current;
