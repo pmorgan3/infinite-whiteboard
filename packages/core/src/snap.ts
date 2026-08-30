@@ -1,5 +1,6 @@
 import type { Point, WBElement, SnapConfig, Bounds, SnapGuides, AnchorPosition, ArrowElement, GroupElement } from './types';
 import type { Viewport } from './viewport';
+import { rotatedRectBounds } from './geometry';
 
 export function snapToGrid(point: Point, config: SnapConfig): Point {
   if (!config.enabled) return point;
@@ -12,7 +13,7 @@ export function snapToGrid(point: Point, config: SnapConfig): Point {
 export function getElementBounds(el: WBElement): Bounds {
   switch (el.type) {
     case 'rectangle':
-      return {
+      return rotatedRectBounds({
         left: el.x,
         top: el.y,
         right: el.x + el.width,
@@ -21,9 +22,9 @@ export function getElementBounds(el: WBElement): Bounds {
         centerY: el.y + el.height / 2,
         width: el.width,
         height: el.height,
-      };
+      }, el.rotation ?? 0);
     case 'ellipse':
-      return {
+      return rotatedRectBounds({
         left: el.x - el.rx,
         top: el.y - el.ry,
         right: el.x + el.rx,
@@ -32,7 +33,7 @@ export function getElementBounds(el: WBElement): Bounds {
         centerY: el.y,
         width: el.rx * 2,
         height: el.ry * 2,
-      };
+      }, el.rotation ?? 0);
     case 'path': {
       const xs = el.points.map(p => p.x);
       const ys = el.points.map(p => p.y);
@@ -40,7 +41,7 @@ export function getElementBounds(el: WBElement): Bounds {
       const maxX = Math.max(...xs);
       const minY = Math.min(...ys);
       const maxY = Math.max(...ys);
-      return {
+      return rotatedRectBounds({
         left: minX,
         top: minY,
         right: maxX,
@@ -49,12 +50,12 @@ export function getElementBounds(el: WBElement): Bounds {
         centerY: (minY + maxY) / 2,
         width: maxX - minX,
         height: maxY - minY,
-      };
+      }, el.rotation ?? 0);
     }
     case 'text':
     case 'sticky':
     case 'image':
-      return {
+      return rotatedRectBounds({
         left: el.x,
         top: el.y,
         right: el.x + el.width,
@@ -63,7 +64,7 @@ export function getElementBounds(el: WBElement): Bounds {
         centerY: el.y + el.height / 2,
         width: el.width,
         height: el.height,
-      };
+      }, el.rotation ?? 0);
     case 'arrow': {
       const minX = Math.min(el.startX, el.endX);
       const maxX = Math.max(el.startX, el.endX);

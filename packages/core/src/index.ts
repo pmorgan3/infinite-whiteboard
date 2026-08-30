@@ -1,4 +1,4 @@
-export type { Point, ViewportState, WBElement, ToolType, Selection, TextElement, StickyNoteElement, TextAlign, FontWeight, FontStyle, ImageElement, ArrowElement, SnapConfig, Bounds, SnapGuides, ThemeConfig, WhiteboardState, AnchorPosition, ArrowBinding, GroupElement } from './types';
+export type { Point, ViewportState, WBElement, ToolType, Selection, TextElement, StickyNoteElement, TextAlign, FontWeight, FontStyle, ImageElement, ArrowElement, SnapConfig, Bounds, SnapGuides, ThemeConfig, WhiteboardState, AnchorPosition, ArrowBinding, GroupElement, ResizeHandle } from './types';
 export { LIGHT_THEME, DARK_THEME, GROUP_COLORS } from './types';
 export { Viewport } from './viewport';
 export { Renderer } from './renderer';
@@ -6,7 +6,10 @@ export type { RenderPreview } from './renderer';
 export { Whiteboard } from './whiteboard';
 export type { Tool, ToolContext, ToolOptions } from './tools';
 export { createTool, generateId, hitTest, getElementPos, moveElement } from './tools';
-export { HistoryStack, AddElementCommand, DeleteElementsCommand, MoveElementsCommand, UpdateElementCommand } from './history';
+export { HistoryStack, AddElementCommand, DeleteElementsCommand, MoveElementsCommand, UpdateElementCommand, SnapshotCommand } from './history';
+export { rotatePoint, boundsFromPoints, unionBounds, rotatedRectBounds, pointInRotatedBounds, getHandlePoints, hitTestHandle, resizeBounds, transformElement, rotateElement, MIN_ELEMENT_SIZE, ROTATION_SNAP } from './geometry';
+export { WHITEBOARD_CLIPBOARD_MIME, createClipboardPayload, parseClipboardPayload, remapClipboardElements } from './clipboard';
+export type { ClipboardPayload } from './clipboard';
 export type { Command } from './history';
 export { snapToGrid, snapToGuides, getElementBounds, shiftBounds, getAnchorPoint, resolveBindings, cleanupBindings } from './snap';
 export { createGroup, getGroupBounds, dissolveGroup, moveToGroup } from './group-utils';

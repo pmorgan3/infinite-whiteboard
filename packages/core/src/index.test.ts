@@ -61,6 +61,33 @@ describe('types', () => {
   });
 });
 
+describe('locking and ordering', () => {
+  it('does not restyle or reorder locked selections', () => {
+    const wb = new Whiteboard({ canvas: createMockCanvas() });
+    wb.elements = [
+      { id: 'locked', type: 'rectangle', x: 0, y: 0, width: 10, height: 10, color: '#000', strokeWidth: 1, locked: true },
+      { id: 'free', type: 'rectangle', x: 20, y: 0, width: 10, height: 10, color: '#000', strokeWidth: 1 },
+    ];
+    wb.selectedIds = new Set(['locked']);
+    wb.updateSelection({ color: '#f00' });
+    wb.reorderSelection('front');
+    expect(wb.elements.map(el => el.id)).toEqual(['locked', 'free']);
+    expect(wb.elements[0].color).toBe('#000');
+    wb.destroy();
+  });
+
+  it('reorders multiple selected elements as one deterministic action', () => {
+    const wb = new Whiteboard({ canvas: createMockCanvas() });
+    wb.elements = ['a', 'b', 'c'].map((id, x) => ({ id, type: 'rectangle', x, y: 0, width: 1, height: 1, color: '#000', strokeWidth: 1 }));
+    wb.selectedIds = new Set(['a', 'b']);
+    wb.reorderSelection('front');
+    expect(wb.elements.map(el => el.id)).toEqual(['c', 'a', 'b']);
+    wb.undo();
+    expect(wb.elements.map(el => el.id)).toEqual(['a', 'b', 'c']);
+    wb.destroy();
+  });
+});
+
 describe('hitTest', () => {
   it('detects point inside text element', () => {
     const el: TextElement = {

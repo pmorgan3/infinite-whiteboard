@@ -4,6 +4,7 @@ import { LIGHT_THEME } from './types';
 import type { Viewport } from './viewport';
 import { getElementBounds, getAnchorPoint } from './snap';
 import { getGroupBounds } from './group-utils';
+import { getHandlePoints, unionBounds } from './geometry';
 
 export type RenderPreview =
   | {
@@ -89,6 +90,7 @@ export class Renderer {
       this.drawSnapHighlights(viewport, width, height, preview, snapConfig, t);
     }
     this.drawElements(elements, selectedIds, t);
+    this.drawSelectionControls(elements, selectedIds, viewport.zoom, t);
     if (preview) this.drawPreview(preview);
     if (snapGuides) {
       this.drawSnapGuides(viewport, width, height, snapGuides, t);
@@ -182,6 +184,14 @@ export class Renderer {
   }
 
   private drawElement(el: WBElement) {
+    this.ctx.save();
+    const rotation = el.rotation ?? 0;
+    if (rotation && el.type !== 'path' && el.type !== 'arrow' && el.type !== 'group') {
+      const bounds = getElementBounds({ ...el, rotation: 0 } as WBElement);
+      this.ctx.translate(bounds.centerX, bounds.centerY);
+      this.ctx.rotate(rotation);
+      this.ctx.translate(-bounds.centerX, -bounds.centerY);
+    }
     if (el.type === 'path') {
       this.drawPath(el);
     } else if (el.type === 'rectangle') {
@@ -196,6 +206,32 @@ export class Renderer {
       this.drawImageElement(el);
     } else if (el.type === 'arrow') {
       this.drawArrow(el);
+    }
+    this.ctx.restore();
+  }
+
+  private drawSelectionControls(elements: WBElement[], selectedIds: Set<string>, zoom: number, theme: ThemeConfig) {
+    const selected = elements.filter(el => selectedIds.has(el.id));
+    if (!selected.length) return;
+    const expanded = selected.flatMap(el => el.type === 'group' ? el.memberIds.map(id => elements.find(item => item.id === id)).filter(Boolean) as WBElement[] : [el]);
+    if (!expanded.length) return;
+    const bounds = unionBounds(expanded.map(getElementBounds));
+    const size = 8 / zoom;
+    this.ctx.strokeStyle = theme.selectionStroke;
+    this.ctx.fillStyle = theme.background;
+    this.ctx.lineWidth = 1.5 / zoom;
+    this.ctx.setLineDash([]);
+    this.ctx.strokeRect(bounds.left, bounds.top, bounds.width, bounds.height);
+    const handles = getHandlePoints(bounds, zoom);
+    this.ctx.beginPath(); this.ctx.moveTo(handles.n.x, handles.n.y); this.ctx.lineTo(handles.rotate.x, handles.rotate.y); this.ctx.stroke();
+    for (const [name, p] of Object.entries(handles)) {
+      if (name === 'rotate') { this.ctx.beginPath(); this.ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2); this.ctx.fill(); this.ctx.stroke(); }
+      else { this.ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size); this.ctx.strokeRect(p.x - size / 2, p.y - size / 2, size, size); }
+    }
+    if (selected.some(el => el.locked)) {
+      this.ctx.fillStyle = theme.selectionStroke;
+      this.ctx.font = `${14 / zoom}px sans-serif`;
+      this.ctx.fillText('🔒', bounds.right + 6 / zoom, bounds.top - 3 / zoom);
     }
   }
 

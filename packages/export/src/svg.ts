@@ -61,6 +61,13 @@ export function exportToSvg(
 }
 
 function elementToSvg(el: WBElement): string {
+  const content = elementToSvgUnrotated(el);
+  if (!content || !el.rotation || el.type === 'path' || el.type === 'arrow' || el.type === 'group') return content;
+  const center = el.type === 'ellipse' ? { x: el.x, y: el.y } : { x: el.x + el.width / 2, y: el.y + el.height / 2 };
+  return `<g transform="rotate(${el.rotation * 180 / Math.PI} ${center.x} ${center.y})">${content}</g>`;
+}
+
+function elementToSvgUnrotated(el: WBElement): string {
   switch (el.type) {
     case 'path':
       return pathToSvg(el);

@@ -27,6 +27,7 @@ function App() {
   const [showCollab, setShowCollab] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [saveNotice, setSaveNotice] = useState(false);
+  const [, setSelectionRevision] = useState(0);
   const wbRef = useRef<Whiteboard | null>(null);
   const isMobile = useMediaQuery('(max-width: 640px)');
   const { resolvedTheme, toggle: toggleTheme } = useTheme();
@@ -165,7 +166,32 @@ function App() {
         onWhiteboardReady={handleWhiteboardReady}
         theme={resolvedTheme}
         onChange={debouncedSave}
+        onSelectionChange={() => setSelectionRevision(value => value + 1)}
       />
+
+      {wbRef.current && wbRef.current.selectedIds.size > 0 && (() => {
+        const wb = wbRef.current!;
+        const selected = wb.elements.filter(el => wb.selectedIds.has(el.id));
+        const unlocked = selected.filter(el => !el.locked);
+        const colors = new Set(unlocked.map(el => el.color).filter(Boolean));
+        const widths = new Set(unlocked.map(el => el.strokeWidth));
+        const allLocked = selected.every(el => el.locked);
+        return <div className="property-bar" aria-label="Selection properties">
+          <label title={colors.size > 1 ? 'Mixed colors' : 'Stroke color'}>
+            Color
+            <input type="color" value={colors.size === 1 ? [...colors][0] : '#808080'} onChange={e => { wb.updateSelection({ color: e.target.value }); setSelectionRevision(v => v + 1); }} disabled={!unlocked.length} />
+          </label>
+          <label title={widths.size > 1 ? 'Mixed widths' : 'Stroke width'}>
+            Width
+            <input type="number" min="1" max="20" value={widths.size === 1 ? [...widths][0] : ''} placeholder="Mixed" onChange={e => { const value = Number(e.target.value); if (value) wb.updateSelection({ strokeWidth: value }); setSelectionRevision(v => v + 1); }} disabled={!unlocked.length} />
+          </label>
+          <button onClick={() => { wb.updateSelection({ locked: !allLocked }); setSelectionRevision(v => v + 1); }}>{allLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
+          <button onClick={() => wb.reorderSelection('back')} disabled={!unlocked.length} title="Send to back">⇤</button>
+          <button onClick={() => wb.reorderSelection('backward')} disabled={!unlocked.length} title="Send backward">←</button>
+          <button onClick={() => wb.reorderSelection('forward')} disabled={!unlocked.length} title="Bring forward">→</button>
+          <button onClick={() => wb.reorderSelection('front')} disabled={!unlocked.length} title="Bring to front">⇥</button>
+        </div>;
+      })()}
 
       <Toolbar
         tool={tool}

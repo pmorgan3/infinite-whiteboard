@@ -20,7 +20,12 @@ export interface BaseElement {
   type: string;
   color: string;
   strokeWidth: number;
+  /** Clockwise rotation around the element center, in radians. */
+  rotation?: number;
+  locked?: boolean;
 }
+
+export type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
 export interface PathElement extends BaseElement {
   type: 'path';
