@@ -25,6 +25,22 @@ interface CanvasProps {
   onViewportChange?: () => void;
 }
 
+function TextAlignIcon({ align }: { align: TextAlign }) {
+  const lines = align === 'left'
+    ? [[3, 5, 17], [3, 9, 13], [3, 13, 17], [3, 17, 11]]
+    : align === 'center'
+      ? [[3, 5, 17], [5, 9, 15], [3, 13, 17], [6, 17, 14]]
+      : [[3, 5, 17], [7, 9, 17], [3, 13, 17], [9, 17, 17]];
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18">
+      {lines.map(([x1, y, x2]) => (
+        <path key={`${x1}-${y}-${x2}`} d={`M${x1} ${y}H${x2}`} fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.75" />
+      ))}
+    </svg>
+  );
+}
+
 export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd, roomId, userName, websocketUrl, onCollabStatus, onParticipantsChange, onCollabError, snapEnabled, onWhiteboardReady, theme, onChange, onSelectionChange, onContentChange, onViewportChange }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wbRef = useRef<Whiteboard | null>(null);
@@ -342,23 +358,34 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
 
       {formattedElements.length > 0 && (
         <div className="formatting-bar" role="toolbar" aria-label="Text formatting">
-          <select aria-label="Font size preset" value={String(commonValue('fontSize') ?? '')} onChange={e => applyFormatting({ fontSize: Number(e.target.value) })}>
+          <select aria-label="Font size preset" title="Font size preset" value={String(commonValue('fontSize') ?? '')} onChange={e => applyFormatting({ fontSize: Number(e.target.value) })}>
             <option value="" disabled>Mixed</option>
             {[12, 16, 20, 24, 32, 48].map(size => <option key={size} value={size}>{size}px</option>)}
           </select>
-          <input aria-label="Font size" type="number" min="8" max="96" value={String(commonValue('fontSize') ?? '')} placeholder="Mixed" onChange={e => {
+          <input aria-label="Exact font size" title="Exact font size" type="number" min="8" max="96" value={String(commonValue('fontSize') ?? '')} placeholder="Mixed" onChange={e => {
             const size = Number(e.target.value);
             if (Number.isFinite(size) && size >= 8 && size <= 96) applyFormatting({ fontSize: size });
           }} />
-          <select aria-label="Font family" value={String(commonValue('fontFamily') ?? '')} onChange={e => applyFormatting({ fontFamily: e.target.value })}>
+          <select aria-label="Font family" title="Font family" value={String(commonValue('fontFamily') ?? '')} onChange={e => applyFormatting({ fontFamily: e.target.value })}>
             <option value="" disabled>Mixed</option><option value="sans-serif">Sans</option><option value="serif">Serif</option><option value="monospace">Mono</option>
           </select>
-          {(['left', 'center', 'right'] as TextAlign[]).map(align => <button key={align} aria-label={`${align} align`} aria-pressed={commonValue('textAlign') === align} onClick={() => applyFormatting({ textAlign: align })}>{align[0].toUpperCase()}</button>)}
-          <button aria-label="Bold" aria-pressed={commonValue('fontWeight') === 'bold'} onClick={() => applyFormatting({ fontWeight: (commonValue('fontWeight') === 'bold' ? 'normal' : 'bold') as FontWeight })}><strong>B</strong></button>
-          <button aria-label="Italic" aria-pressed={commonValue('fontStyle') === 'italic'} onClick={() => applyFormatting({ fontStyle: (commonValue('fontStyle') === 'italic' ? 'normal' : 'italic') as FontStyle })}><em>I</em></button>
-          {editingEl && <><button aria-label="Bulleted list" onClick={() => toggleList(false)}>• list</button><button aria-label="Numbered list" onClick={() => toggleList(true)}>1. list</button></>}
-          <input aria-label="Text color" type="color" value={String(commonValue('color') ?? '#1f2937')} onChange={e => applyFormatting({ color: e.target.value })} />
-          {formattedElements.some(el => el.type === 'sticky') && <input aria-label="Sticky fill" type="color" value={String(commonValue('fill') ?? '#fef08a')} onChange={e => applyStickyFill(e.target.value)} />}
+          {(['left', 'center', 'right'] as TextAlign[]).map(align => (
+            <button
+              key={align}
+              className="formatting-icon-button"
+              aria-label={`Align ${align}`}
+              aria-pressed={commonValue('textAlign') === align}
+              title={`Align ${align}`}
+              onClick={() => applyFormatting({ textAlign: align })}
+            >
+              <TextAlignIcon align={align} />
+            </button>
+          ))}
+          <button className="formatting-icon-button" aria-label="Bold" aria-pressed={commonValue('fontWeight') === 'bold'} title="Bold" onClick={() => applyFormatting({ fontWeight: (commonValue('fontWeight') === 'bold' ? 'normal' : 'bold') as FontWeight })}><strong>B</strong></button>
+          <button className="formatting-icon-button" aria-label="Italic" aria-pressed={commonValue('fontStyle') === 'italic'} title="Italic" onClick={() => applyFormatting({ fontStyle: (commonValue('fontStyle') === 'italic' ? 'normal' : 'italic') as FontStyle })}><em>I</em></button>
+          {editingEl && <><button aria-label="Bulleted list" title="Bulleted list" onClick={() => toggleList(false)}>• list</button><button aria-label="Numbered list" title="Numbered list" onClick={() => toggleList(true)}>1. list</button></>}
+          <input aria-label="Text color" title="Text color" type="color" value={String(commonValue('color') ?? '#1f2937')} onChange={e => applyFormatting({ color: e.target.value })} />
+          {formattedElements.some(el => el.type === 'sticky') && <input aria-label="Sticky note color" title="Sticky note color" type="color" value={String(commonValue('fill') ?? '#fef08a')} onChange={e => applyStickyFill(e.target.value)} />}
         </div>
       )}
 
