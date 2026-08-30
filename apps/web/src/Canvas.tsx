@@ -35,6 +35,14 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
   const [cursors, setCursors] = useState<Map<number, CursorInfo>>(new Map());
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
   const [, forceUpdate] = useState(0);
+  const onChangeRef = useRef(onChange);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  const onContentChangeRef = useRef(onContentChange);
+  const onViewportChangeRef = useRef(onViewportChange);
+  onChangeRef.current = onChange;
+  onSelectionChangeRef.current = onSelectionChange;
+  onContentChangeRef.current = onContentChange;
+  onViewportChangeRef.current = onViewportChange;
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -44,13 +52,13 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
         if (collabRef.current) {
           collabRef.current.setElements(wb.elements);
         }
-        onChange?.();
-        onContentChange?.();
+        onChangeRef.current?.();
+        onContentChangeRef.current?.();
         forceUpdate((value) => value + 1);
       },
       onViewportChange: () => {
         forceUpdate((value) => value + 1);
-        onViewportChange?.();
+        onViewportChangeRef.current?.();
       },
       onStartEditing: (elementId) => {
         setEditingElementId(elementId);
@@ -59,7 +67,7 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
         pendingImagePoint.current = point;
         fileInputRef.current?.click();
       },
-      onSelectionChange,
+      onSelectionChange: () => onSelectionChangeRef.current?.(),
     });
     wbRef.current = wb;
     onWhiteboardReady?.(wb);
@@ -96,7 +104,7 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
       onElementsChange: (elements) => {
         wb.elements = elements;
         wb.scheduleRender();
-        onContentChange?.();
+        onContentChangeRef.current?.();
       },
       onCursorsChange: (newCursors) => {
         setCursors(new Map(newCursors));
@@ -107,6 +115,7 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
     });
 
     collabRef.current = collab;
+    collab.setElements(wb.elements);
 
     const sendCursor = (e: PointerEvent) => {
       const canvas = canvasRef.current!;

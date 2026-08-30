@@ -1305,6 +1305,28 @@ describe('WhiteboardState serialization', () => {
     wb.setState(state);
     expect(wb.elements.length).toBe(prevElements);
   });
+
+  it('can restore state without reporting a document change', () => {
+    const canvas = createMockCanvas();
+    let changes = 0;
+    const wb = new Whiteboard({ canvas, onChange: () => { changes++; } });
+    const state: WhiteboardState = {
+      version: Version,
+      elements: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      toolColor: '#000',
+      toolStrokeWidth: 2,
+      toolArrowStart: false,
+      toolArrowEnd: true,
+      snapEnabled: false,
+      themeMode: 'light',
+    };
+
+    wb.setState(state, false);
+    expect(changes).toBe(0);
+    wb.setState(state);
+    expect(changes).toBe(1);
+  });
 });
 
 describe('ArrowElement with bindings', () => {

@@ -1,48 +1,80 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { Whiteboard, WhiteboardState } from '@whiteboard/core';
 
-const STORAGE_KEY = 'whiteboard-state';
 const SAVE_DELAY_MS = 500;
 
-function saveToLocalStorage(state: WhiteboardState): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
-}
+export class BoardSaveScheduler {
+  private timer: ReturnType<typeof setTimeout> | null = null;
 
-export function loadState(): WhiteboardState | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as WhiteboardState;
-  } catch {
-    return null;
+  constructor(
+    private readonly persist: (boardId: string, state: WhiteboardState) => Promise<void>,
+    private readonly onError: (error: unknown) => void,
+    private readonly delay = SAVE_DELAY_MS,
+  ) {}
+
+  schedule(boardId: string, state: WhiteboardState): void {
+    this.cancel();
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      void this.persist(boardId, state).catch(this.onError);
+    }, this.delay);
+  }
+
+  cancel(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
   }
 }
 
 export function useAutoSave(
   wbRef: React.RefObject<Whiteboard | null>,
   themeMode: 'light' | 'dark',
+  activeBoardId: string | null,
+  saveState: (boardId: string, state: WhiteboardState) => Promise<void>,
+  onError: (error: unknown) => void,
 ) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveStateRef = useRef(saveState);
+  const onErrorRef = useRef(onError);
+  saveStateRef.current = saveState;
+  onErrorRef.current = onError;
+  const schedulerRef = useRef<BoardSaveScheduler | null>(null);
+  if (!schedulerRef.current) {
+    schedulerRef.current = new BoardSaveScheduler(
+      (boardId, state) => saveStateRef.current(boardId, state),
+      (error) => onErrorRef.current(error),
+    );
+  }
 
-  const save = useCallback(() => {
+  const save = useCallback(async (boardId = activeBoardId) => {
     const wb = wbRef.current;
-    if (!wb) return;
+    if (!wb || !boardId) return false;
     const state = wb.getState(themeMode);
-    saveToLocalStorage(state);
-  }, [wbRef, themeMode]);
+    try {
+      await saveState(boardId, state);
+      return true;
+    } catch (error) {
+      onError(error);
+      return false;
+    }
+  }, [activeBoardId, onError, saveState, themeMode, wbRef]);
 
   const debouncedSave = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(save, SAVE_DELAY_MS);
-  }, [save]);
+    const scheduledBoardId = activeBoardId;
+    const wb = wbRef.current;
+    if (!scheduledBoardId || !wb) return;
+    const scheduledState = wb.getState(themeMode);
+    schedulerRef.current?.schedule(scheduledBoardId, scheduledState);
+  }, [activeBoardId, themeMode, wbRef]);
+
+  const cancelPendingSave = useCallback(() => {
+    schedulerRef.current?.cancel();
+  }, []);
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      cancelPendingSave();
     };
-  }, []);
+  }, [cancelPendingSave]);
 
-  return { save, debouncedSave };
+  return { save, debouncedSave, cancelPendingSave };
 }

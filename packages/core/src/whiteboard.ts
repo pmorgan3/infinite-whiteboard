@@ -575,7 +575,7 @@ export class Whiteboard {
     };
   }
 
-  setState(state: WhiteboardState): void {
+  setState(state: WhiteboardState, notifyChange = true): void {
     if (state.version !== STATE_VERSION) return;
     this.elements = state.elements.map(el => ({ ...el, rotation: el.rotation ?? 0, locked: el.locked ?? false }));
     this.viewport = new Viewport(state.viewport);
@@ -593,7 +593,7 @@ export class Whiteboard {
       arrowEnd: this.toolArrowEnd,
     });
     this.history = new HistoryStack();
-    this.onChange?.();
+    if (notifyChange) this.onChange?.();
     this.scheduleRender();
   }
 
