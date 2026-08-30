@@ -11,6 +11,8 @@ import { Whiteboard, Viewport, DARK_THEME, LIGHT_THEME } from '@whiteboard/core'
 import type { ToolType } from '@whiteboard/core';
 import { exportToPng, exportToSvg, exportToJson, importFromJson } from '@whiteboard/export';
 import { downloadBlob, downloadString } from './download';
+import type { CollabStatus, ParticipantInfo } from '@whiteboard/collab';
+import { collaborationWebsocketUrl, roomFromUrl, urlForRoom, validateRoomId } from './collaboration';
 
 function App() {
   const [restored, setRestored] = useState(false);
@@ -21,8 +23,13 @@ function App() {
   const [arrowStart, setArrowStart] = useState(savedState?.toolArrowStart ?? false);
   const [arrowEnd, setArrowEnd] = useState(savedState?.toolArrowEnd ?? true);
   const [snapEnabled, setSnapEnabled] = useState(savedState?.snapEnabled ?? false);
-  const [roomId, setRoomId] = useState('');
-  const [joinedRoom, setJoinedRoom] = useState('');
+  const initialRoom = useMemo(() => roomFromUrl(new URL(window.location.href)), []);
+  const [roomId, setRoomId] = useState(initialRoom.roomId ?? new URL(window.location.href).searchParams.get('room') ?? '');
+  const [joinedRoom, setJoinedRoom] = useState(initialRoom.roomId ?? '');
+  const [roomError, setRoomError] = useState<string | null>(initialRoom.error);
+  const [collabStatus, setCollabStatus] = useState<CollabStatus>('disconnected');
+  const [collabError, setCollabError] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [userName, setUserName] = useState('User ' + Math.floor(Math.random() * 1000));
   const [showCollab, setShowCollab] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -30,6 +37,18 @@ function App() {
   const wbRef = useRef<Whiteboard | null>(null);
   const isMobile = useMediaQuery('(max-width: 640px)');
   const { resolvedTheme, toggle: toggleTheme } = useTheme();
+  const websocketUrl = useMemo(() => collaborationWebsocketUrl(window.location), []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const parsed = roomFromUrl(new URL(window.location.href));
+      setRoomError(parsed.error);
+      setRoomId(parsed.roomId ?? '');
+      setJoinedRoom(parsed.roomId ?? '');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const themeConfig = useMemo(
     () => resolvedTheme === 'dark' ? DARK_THEME : LIGHT_THEME,
@@ -123,6 +142,45 @@ function App() {
     setTimeout(() => setSaveNotice(false), 2000);
   }, [save]);
 
+  const joinRoom = () => {
+    const error = validateRoomId(roomId);
+    setRoomError(error);
+    if (error) return;
+    setCollabError(null);
+    setCollabStatus('connecting');
+    setJoinedRoom(roomId);
+    window.history.pushState({}, '', urlForRoom(new URL(window.location.href), roomId));
+  };
+
+  const leaveRoom = () => {
+    setJoinedRoom('');
+    setParticipants([]);
+    setCollabError(null);
+    setCollabStatus('disconnected');
+    window.history.pushState({}, '', urlForRoom(new URL(window.location.href), null));
+  };
+
+  const copyShareLink = async () => {
+    if (!joinedRoom) return;
+    try { await navigator.clipboard.writeText(urlForRoom(new URL(window.location.href), joinedRoom).href); }
+    catch { setCollabError('Could not copy the share link. Copy it from the address bar instead.'); }
+  };
+
+  const collaborationControls = (
+    <>
+      <label>Name<input value={userName} onChange={(e) => setUserName(e.target.value)} /></label>
+      <label>Room ID<input value={roomId} onChange={(e) => { setRoomId(e.target.value); setRoomError(null); }} placeholder="e.g. project-alpha" /></label>
+      {roomError && <p className="collab-error" role="alert">{roomError}</p>}
+      {!joinedRoom ? <button onClick={joinRoom}>Join Room</button> : (
+        <div className="collab-actions"><button onClick={copyShareLink}>Copy Share Link</button><button onClick={leaveRoom}>Leave Room</button></div>
+      )}
+      <p className={`collab-status status-${collabStatus}`}><span aria-hidden="true" />{collabStatus[0].toUpperCase() + collabStatus.slice(1)}{joinedRoom ? ` · ${joinedRoom}` : ''}</p>
+      {collabError && <p className="collab-error" role="alert">{collabError}</p>}
+      {joinedRoom && <div className="participants"><strong>Participants ({participants.length})</strong>{participants.map((person) => <span key={person.clientId}><i style={{ background: person.color }} />{person.name}{person.isLocal ? ' (you)' : ''}</span>)}</div>}
+      <p className="security-note">Anyone with this room link can access and edit the board.</p>
+    </>
+  );
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -160,6 +218,10 @@ function App() {
         arrowEnd={arrowEnd}
         roomId={joinedRoom || undefined}
         userName={userName}
+        websocketUrl={websocketUrl}
+        onCollabStatus={setCollabStatus}
+        onParticipantsChange={setParticipants}
+        onCollabError={(error) => setCollabError(error?.message ?? null)}
         snapEnabled={snapEnabled}
         onWhiteboardReady={handleWhiteboardReady}
         theme={resolvedTheme}
@@ -226,59 +288,13 @@ function App() {
 
       {isMobile ? (
         <BottomSheet isOpen={showCollab} onClose={() => setShowCollab(false)} title="Collaboration">
-          <label>
-            Name
-            <input
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-            />
-          </label>
-          <label>
-            Room ID
-            <input
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              placeholder="e.g. project-alpha"
-            />
-          </label>
-          <button
-            onClick={() => setJoinedRoom(roomId)}
-            disabled={!roomId}
-          >
-            {joinedRoom === roomId && roomId ? 'Connected' : 'Join Room'}
-          </button>
-          {joinedRoom && (
-            <p className="room-info">Connected to: <strong>{joinedRoom}</strong></p>
-          )}
+          {collaborationControls}
         </BottomSheet>
       ) : (
         showCollab && (
           <div className="collab-panel">
             <h3>Collaboration</h3>
-            <label>
-              Name
-              <input
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-              />
-            </label>
-            <label>
-              Room ID
-              <input
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value)}
-                placeholder="e.g. project-alpha"
-              />
-            </label>
-            <button
-              onClick={() => setJoinedRoom(roomId)}
-              disabled={!roomId}
-            >
-              {joinedRoom === roomId && roomId ? 'Connected' : 'Join Room'}
-            </button>
-            {joinedRoom && (
-              <p className="room-info">Connected to: <strong>{joinedRoom}</strong></p>
-            )}
+            {collaborationControls}
           </div>
         )
       )}

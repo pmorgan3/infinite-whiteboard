@@ -19,7 +19,23 @@ if (persistenceDir) {
 const wss = new WebSocketServer({ port: PORT });
 
 wss.on('connection', (ws, req) => {
-  setupWSConnection(ws, req);
+  const room = req.url?.slice(1).split('?')[0] || 'unknown';
+  if (!/^[A-Za-z0-9._-]+$/.test(room)) {
+    console.warn('Rejected connection with invalid room name');
+    ws.close(1008, 'Invalid room name');
+    return;
+  }
+  console.log(`room=${room} connected`);
+  ws.on('error', (error) => console.error(`room=${room} socket error: ${error.message}`));
+  ws.on('close', () => console.log(`room=${room} disconnected`));
+  try {
+    setupWSConnection(ws, req);
+  } catch (error) {
+    console.error(`room=${room} setup failed:`, error);
+    ws.close(1011, 'Collaboration setup failed');
+  }
 });
+
+wss.on('error', (error) => console.error(`WebSocket server error: ${error.message}`));
 
 console.log(`Whiteboard server running on ws://localhost:${PORT}`);
