@@ -1,0 +1,10 @@
+{
+  "extends": "@whiteboard/tsconfig/base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "lib": ["ESNext"],
+    "jsx": "preserve"
+  },
+  "include": ["src"]
+}

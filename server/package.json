@@ -1,0 +1,21 @@
+{
+  "name": "@whiteboard/server",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "y-websocket": "^2.0.0",
+    "yjs": "^13.6.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.0",
+    "@whiteboard/tsconfig": "workspace:*",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

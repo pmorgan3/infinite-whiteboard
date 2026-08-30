@@ -1,0 +1,25 @@
+{
+  "name": "@whiteboard/collab",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc && vite build",
+    "clean": "rm -rf dist",
+    "lint": "eslint src",
+    "dev": "vite build --watch"
+  },
+  "dependencies": {
+    "@whiteboard/core": "workspace:*",
+    "yjs": "^13.6.0",
+    "y-websocket": "^2.0.0",
+    "lib0": "^0.2.0"
+  },
+  "devDependencies": {
+    "@whiteboard/tsconfig": "workspace:*",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vite-plugin-dts": "^4.5.0"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Infinite Whiteboard",
+  "version": "0.0.0",
+  "identifier": "com.whiteboard.infinite",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @whiteboard/web dev",
+    "beforeBuildCommand": "echo 'web built via turbo'",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../../web/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Infinite Whiteboard",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false
+  }
+}
