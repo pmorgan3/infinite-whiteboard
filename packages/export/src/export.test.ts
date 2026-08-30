@@ -5,6 +5,22 @@ import { exportToSvg } from './svg';
 import { exportToJson, importFromJson } from './json';
 
 describe('computeBounds', () => {
+  it('exports sticky fill, escaped wrapped aligned styled list text', () => {
+    const elements: WBElement[] = [{
+      id: 'sticky', type: 'sticky', x: 0, y: 0, width: 100, height: 100,
+      text: '- one & two words', fill: '#fef08a', fontSize: 16,
+      fontFamily: 'serif', textAlign: 'center', fontWeight: 'bold',
+      fontStyle: 'italic', color: '#111111', strokeWidth: 0,
+    }];
+    const svg = exportToSvg(elements);
+    expect(svg).toContain('fill="#fef08a"');
+    expect(svg).toContain('font-weight="bold"');
+    expect(svg).toContain('font-style="italic"');
+    expect(svg).toContain('&amp;');
+    expect(svg.match(/<tspan/g)?.length).toBeGreaterThan(1);
+    expect(svg).toContain('- one');
+  });
+
   it('returns null for empty elements', () => {
     expect(computeBounds([])).toBeNull();
   });

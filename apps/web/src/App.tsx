@@ -140,6 +140,7 @@ function App() {
         case 'e': case 'E': setTool('ellipse'); break;
         case 'a': case 'A': setTool('arrow'); break;
         case 't': case 'T': setTool('text'); break;
+        case 'n': case 'N': setTool('sticky'); break;
         case 'i': case 'I': setTool('image'); break;
       }
     };

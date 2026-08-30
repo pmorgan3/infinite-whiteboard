@@ -52,6 +52,8 @@ export function createTool(type: ToolType, options: ToolOptions): Tool {
       return new SelectTool();
     case 'text':
       return new TextTool();
+    case 'sticky':
+      return new StickyTool();
     case 'image':
       return new ImageTool();
     case 'arrow':
@@ -300,6 +302,50 @@ class TextTool implements Tool {
 
   onPointerMove() {}
   onPointerUp() {}
+}
+
+export class StickyTool implements Tool {
+  private start: Point | null = null;
+  private end: Point | null = null;
+
+  onPointerDown(e: PointerEvent, ctx: ToolContext) {
+    if (e.button !== 0) return;
+    const off = ctx.getOffset(e);
+    const world = ctx.viewport.screenToWorld(off, ctx.canvasWidth, ctx.canvasHeight);
+    const clicked = [...ctx.elements].reverse().find(el => el.type === 'sticky' && hitTest(el, world));
+    if (clicked) {
+      ctx.setSelectedIds(new Set([clicked.id]));
+      ctx.startEditing(clicked.id);
+      return;
+    }
+    this.start = world;
+    this.end = world;
+  }
+
+  onPointerMove(e: PointerEvent, ctx: ToolContext) {
+    if (!this.start) return;
+    const off = ctx.getOffset(e);
+    this.end = ctx.viewport.screenToWorld(off, ctx.canvasWidth, ctx.canvasHeight);
+  }
+
+  onPointerUp(_e: PointerEvent, ctx: ToolContext) {
+    if (!this.start || !this.end) return;
+    const dragged = Math.hypot(this.end.x - this.start.x, this.end.y - this.start.y) > 5;
+    const width = dragged ? Math.max(120, Math.abs(this.end.x - this.start.x)) : 220;
+    const height = dragged ? Math.max(96, Math.abs(this.end.y - this.start.y)) : 160;
+    const x = dragged ? Math.min(this.start.x, this.end.x) : this.start.x - width / 2;
+    const y = dragged ? Math.min(this.start.y, this.end.y) : this.start.y - height / 2;
+    const id = generateId();
+    ctx.addElement({
+      id, type: 'sticky', x, y, width, height, text: '', fill: '#fef08a',
+      fontSize: 16, fontFamily: 'sans-serif', textAlign: 'left',
+      fontWeight: 'normal', fontStyle: 'normal', color: '#1f2937', strokeWidth: 0,
+    });
+    ctx.setSelectedIds(new Set([id]));
+    ctx.startEditing(id);
+    this.start = null;
+    this.end = null;
+  }
 }
 
 class ImageTool implements Tool {
@@ -632,7 +678,7 @@ export function hitTest(el: WBElement, point: Point): boolean {
     const ny = (point.y - el.y) / (el.ry + margin);
     return nx * nx + ny * ny <= 1;
   }
-  if (el.type === 'text' || el.type === 'image') {
+  if (el.type === 'text' || el.type === 'sticky' || el.type === 'image') {
     return (
       point.x >= el.x - margin &&
       point.x <= el.x + el.width + margin &&
@@ -687,7 +733,7 @@ export function getElementPos(el: WBElement): Point {
   if (el.type === 'ellipse') {
     return { x: el.x - el.rx, y: el.y - el.ry };
   }
-  if (el.type === 'text') {
+  if (el.type === 'text' || el.type === 'sticky') {
     return { x: el.x, y: el.y };
   }
   if (el.type === 'image') {
@@ -720,7 +766,7 @@ export function moveElement(el: WBElement, x: number, y: number): WBElement {
   if (el.type === 'ellipse') {
     return { ...el, x: x + el.rx, y: y + el.ry };
   }
-  if (el.type === 'text') {
+  if (el.type === 'text' || el.type === 'sticky') {
     return { ...el, x, y };
   }
   if (el.type === 'image') {

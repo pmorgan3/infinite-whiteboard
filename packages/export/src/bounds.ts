@@ -44,6 +44,7 @@ function getElementBounds(el: WBElement): { minX: number; minY: number; maxX: nu
     case 'ellipse':
       return { minX: el.x - el.rx - pad, minY: el.y - el.ry - pad, maxX: el.x + el.rx + pad, maxY: el.y + el.ry + pad };
     case 'text':
+    case 'sticky':
       return { minX: el.x - pad, minY: el.y - pad, maxX: el.x + el.width + pad, maxY: el.y + el.height + pad };
     case 'image':
       return { minX: el.x - pad, minY: el.y - pad, maxX: el.x + el.width + pad, maxY: el.y + el.height + pad };
