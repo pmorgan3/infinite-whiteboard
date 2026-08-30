@@ -1,4 +1,5 @@
 import type { Point, ViewportState } from './types';
+import { MAX_ZOOM, MIN_ZOOM } from './navigation';
 
 export class Viewport {
   x = 0;
@@ -37,7 +38,7 @@ export class Viewport {
 
   zoomToPoint(screenX: number, screenY: number, newZoom: number, canvasWidth: number, canvasHeight: number): void {
     const worldBefore = this.screenToWorld({ x: screenX, y: screenY }, canvasWidth, canvasHeight);
-    this.zoom = Math.max(0.05, Math.min(10, newZoom));
+    this.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Number.isFinite(newZoom) ? newZoom : this.zoom));
     const worldAfter = this.screenToWorld({ x: screenX, y: screenY }, canvasWidth, canvasHeight);
     this.x += (worldAfter.x - worldBefore.x) * this.zoom;
     this.y += (worldAfter.y - worldBefore.y) * this.zoom;

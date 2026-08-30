@@ -15,3 +15,4 @@ export { snapToGrid, snapToGuides, getElementBounds, shiftBounds, getAnchorPoint
 export { createGroup, getGroupBounds, dissolveGroup, moveToGroup } from './group-utils';
 export { layoutText, requiredTextHeight, textFont, TEXT_PADDING, TEXT_LINE_HEIGHT } from './text-layout';
 export type { TextLayoutOptions, TextLayoutLine } from './text-layout';
+export { MIN_ZOOM, MAX_ZOOM, unionBounds as unionNavigationBounds, getElementsBounds, viewportForBounds } from './navigation';

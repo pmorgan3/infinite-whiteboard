@@ -720,6 +720,91 @@ body {
   caret-color: var(--text-primary);
 }
 
+.navigation-controls {
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-sm);
+
+  button { min-width: 36px; height: 34px; border: 0; border-radius: 7px; background: transparent; color: var(--text-primary); cursor: pointer; }
+  button:hover { background: var(--hover-bg); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .zoom-percent { min-width: 58px; }
+}
+
+.zoom-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 36px;
+  width: 140px;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-md);
+  display: grid;
+
+  button { text-align: left; padding: 0 10px; }
+}
+
+.minimap, .minimap-show {
+  position: absolute;
+  right: 16px;
+  bottom: 52px;
+  z-index: 11;
+}
+
+.minimap {
+  width: 210px;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-sm);
+
+  canvas { display: block; width: 198px; height: 126px; border-radius: 6px; touch-action: none; cursor: crosshair; }
+}
+
+.minimap-hide, .minimap-show {
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  padding: 5px 8px;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.minimap-hide { display: block; margin: 0 0 4px auto; border: 0; font-size: 11px; }
+
+.search-popover {
+  position: absolute;
+  z-index: 30;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-md);
+
+  input { width: 230px; padding: 7px 9px; border: 1px solid var(--input-border); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); }
+  span { min-width: 60px; font-size: 12px; text-align: center; }
+  button { width: 30px; height: 30px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); cursor: pointer; }
+  button:hover { background: var(--hover-bg); }
+}
+
 @media (max-width: 640px) {
   .app {
     padding-bottom: calc(8px + env(safe-area-inset-bottom));
@@ -831,6 +916,14 @@ body {
   .shortcuts {
     display: none;
   }
+
+  .navigation-controls { bottom: calc(76px + env(safe-area-inset-bottom)); max-width: calc(100vw - 16px); }
+  .navigation-controls button { min-width: 34px; }
+  .minimap { right: 8px; bottom: calc(126px + env(safe-area-inset-bottom)); width: 156px; }
+  .minimap canvas { width: 144px; height: 92px; }
+  .minimap-show { right: 8px; bottom: calc(126px + env(safe-area-inset-bottom)); }
+  .search-popover { top: 70px; width: calc(100vw - 16px); }
+  .search-popover input { min-width: 0; flex: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
