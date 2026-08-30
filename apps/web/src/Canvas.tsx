@@ -104,6 +104,7 @@ export default function Canvas({ tool, color, strokeWidth, arrowStart, arrowEnd,
       onElementsChange: (elements) => {
         wb.elements = elements;
         wb.scheduleRender();
+        onChangeRef.current?.();
         onContentChangeRef.current?.();
       },
       onCursorsChange: (newCursors) => {
